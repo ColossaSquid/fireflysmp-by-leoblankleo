@@ -640,8 +640,6 @@
     })();
   }
 
-  renderEpisodes();
-
   // ===== CAROUSEL NAVIGATION =====
   function scrollCarousel(dir) {
     const track = document.querySelector('.episodes-track');
@@ -766,13 +764,58 @@
   const LS_SESSION = 'firefly_session';
   const LS_ANNOUNCEMENTS = 'firefly_announcements';
 
+  // ===== FIREBASE INIT =====
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0TVbhWKGZEJ-gxmu3wPpeis4Eh9lZyjI",
+    authDomain: "firefly-7e141.firebaseapp.com",
+    projectId: "firefly-7e141",
+    storageBucket: "firefly-7e141.firebasestorage.app",
+    messagingSenderId: "975424327009",
+    appId: "1:975424327009:web:a0219e50c87bb230e10920",
+    measurementId: "G-CW1X29CP35"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  async function syncFromFirestore() {
+    try {
+      const [usSnap, anSnap] = await Promise.all([
+        db.collection('users').get(),
+        db.collection('announcements').get()
+      ]);
+      if (!usSnap.empty) {
+        const users = usSnap.docs.map(d => d.data());
+        localStorage.setItem(LS_USERS, JSON.stringify(users));
+      }
+      if (!anSnap.empty) {
+        const announcements = anSnap.docs.map(d => d.data());
+        localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(announcements));
+      }
+    } catch (e) {
+      console.warn('Firestore sync failed, using local data:', e);
+    }
+    renderEpisodes();
+    renderAnnouncements();
+  }
+
   function getUsers() { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); }
-  function saveUsers(u) { localStorage.setItem(LS_USERS, JSON.stringify(u)); }
+  function saveUsers(u) {
+    localStorage.setItem(LS_USERS, JSON.stringify(u));
+    u.forEach(user => db.collection('users').doc(user.email).set(user).catch(() => {}));
+  }
   function getSession() { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); }
   function saveSession(s) { localStorage.setItem(LS_SESSION, JSON.stringify(s)); }
   function clearSession() { localStorage.removeItem(LS_SESSION); }
   function getAnnouncements() { return JSON.parse(localStorage.getItem(LS_ANNOUNCEMENTS) || '[]'); }
-  function saveAnnouncements(a) { localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a)); }
+  function saveAnnouncements(a) {
+    localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
+    const batch = db.batch();
+    a.forEach(ann => {
+      const ref = db.collection('announcements').doc(ann.id);
+      batch.set(ref, ann);
+    });
+    batch.commit().catch(() => {});
+  }
   function hashPass(p) { return btoa(p); }
 
   const authModal = document.getElementById('authModal');
@@ -1131,6 +1174,7 @@
     let announcements = getAnnouncements();
     announcements = announcements.filter(a => a.id !== id);
     saveAnnouncements(announcements);
+    db.collection('announcements').doc(id).delete().catch(() => {});
     renderAdminDashboard();
     renderAnnouncements();
   }
@@ -1227,6 +1271,7 @@
   // INIT
   // ============================================================
 
+  renderEpisodes();
   updateNav();
-  renderAnnouncements();
+  syncFromFirestore();
 })();
