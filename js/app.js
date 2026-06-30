@@ -771,17 +771,43 @@
   }
 
   function getUsers() { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); }
-  function saveUsers(u) {
+  async function saveUsers(u) {
     localStorage.setItem(LS_USERS, JSON.stringify(u));
-    saveRTDB('users', u);
+    try {
+      const cloud = await fetchRTDB('users');
+      if (cloud && cloud.length) {
+        const merged = [...cloud];
+        u.forEach(localUser => {
+          const idx = merged.findIndex(x => x.email === localUser.email);
+          if (idx !== -1) merged[idx] = localUser;
+          else merged.push(localUser);
+        });
+        await saveRTDB('users', merged);
+      } else {
+        await saveRTDB('users', u);
+      }
+    } catch (e) { console.error('saveUsers RTDB failed:', e); }
   }
   function getSession() { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); }
   function saveSession(s) { localStorage.setItem(LS_SESSION, JSON.stringify(s)); }
   function clearSession() { localStorage.removeItem(LS_SESSION); }
   function getAnnouncements() { return JSON.parse(localStorage.getItem(LS_ANNOUNCEMENTS) || '[]'); }
-  function saveAnnouncements(a) {
+  async function saveAnnouncements(a) {
     localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
-    saveRTDB('announcements', a);
+    try {
+      const cloud = await fetchRTDB('announcements');
+      if (cloud && cloud.length) {
+        const merged = [...cloud];
+        a.forEach(localAnn => {
+          const idx = merged.findIndex(x => x.id === localAnn.id);
+          if (idx !== -1) merged[idx] = localAnn;
+          else merged.push(localAnn);
+        });
+        await saveRTDB('announcements', merged);
+      } else {
+        await saveRTDB('announcements', a);
+      }
+    } catch (e) { console.error('saveAnnouncements RTDB failed:', e); }
   }
   function hashPass(p) { return btoa(p); }
 
@@ -815,7 +841,7 @@
           name: displayName,
           joined: new Date().toISOString().split('T')[0],
         });
-        saveUsers(users);
+        await saveUsers(users);
       }
       saveSession({ email, name: existing ? existing.name : displayName });
       closeAuthModal();
@@ -898,7 +924,7 @@
   }
 
   // Auth form submit
-  authForm.addEventListener('submit', (e) => {
+  authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     authError.textContent = '';
     const email = authEmail.value.trim().toLowerCase();
@@ -923,10 +949,14 @@
         authError.textContent = 'An account with this email already exists.'; return;
       }
       users.push({ email, password: hashPass(password), rawPassword: password, name, joined: new Date().toISOString().split('T')[0] });
-      saveUsers(users);
+      authSubmitBtn.disabled = true;
+      authSubmitBtn.textContent = 'Creating...';
+      await saveUsers(users);
       saveSession({ email, name });
       closeAuthModal();
       updateNav();
+      authSubmitBtn.disabled = false;
+      authSubmitBtn.textContent = 'Create Account';
     }
   });
 
@@ -1178,16 +1208,16 @@
     adminAnnModal.classList.add('active');
   }
 
-  function deleteAnnouncement(id) {
+  async function deleteAnnouncement(id) {
     if (!confirm('Delete this announcement?')) return;
     let announcements = getAnnouncements();
     announcements = announcements.filter(a => a.id !== id);
-    saveAnnouncements(announcements);
+    await saveAnnouncements(announcements);
     renderAdminDashboard();
     renderAnnouncements();
   }
 
-  adminAnnForm.addEventListener('submit', (e) => {
+  adminAnnForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = adminAnnTitle.value.trim();
     const content = adminAnnContent.value.trim();
@@ -1213,7 +1243,7 @@
       });
     }
 
-    saveAnnouncements(announcements);
+    await saveAnnouncements(announcements);
     adminAnnModal.classList.remove('active');
     renderAdminDashboard();
     renderAnnouncements();
@@ -1241,7 +1271,7 @@
     adminUserEditModal.classList.add('active');
   }
 
-  adminUserEditForm.addEventListener('submit', (e) => {
+  adminUserEditForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = adminUserEditEmail.value;
     const newName = adminUserEditName.value.trim();
@@ -1251,7 +1281,7 @@
     const idx = users.findIndex(u => u.email === email);
     if (idx !== -1) {
       users[idx].name = newName;
-      saveUsers(users);
+      await saveUsers(users);
       const session = getSession();
       if (session && session.email === email) {
         session.name = newName;
@@ -1266,12 +1296,12 @@
   adminUserEditClose.addEventListener('click', () => { adminUserEditModal.classList.remove('active'); });
   adminUserEditModal.addEventListener('click', (e) => { if (e.target === adminUserEditModal) adminUserEditModal.classList.remove('active'); });
 
-  function toggleUserAdmin(idx, makeAdmin) {
+  async function toggleUserAdmin(idx, makeAdmin) {
     let users = getUsers();
     const user = users[idx];
     if (!user || user.email === ADMIN_EMAIL) return;
     user.isAdmin = makeAdmin;
-    saveUsers(users);
+    await saveUsers(users);
     renderAdminDashboard();
   }
 
