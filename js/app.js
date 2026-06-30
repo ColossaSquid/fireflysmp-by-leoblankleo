@@ -713,58 +713,62 @@
   const LS_SESSION = 'firefly_session';
   const LS_ANNOUNCEMENTS = 'firefly_announcements';
 
-  // ===== FIREBASE REALTIME DB STORAGE =====
-  const FB_DB = 'https://firefly-7e141-default-rtdb.firebaseio.com';
+  // ===== FIREBASE REALTIME DB (SDK) =====
+  const FB_DB = firebase.database();
+  const FB_USERS_REF = FB_DB.ref('users');
+  const FB_ANNS_REF = FB_DB.ref('announcements');
 
-  async function fetchRTDB(path) {
-    try {
-      const r = await fetch(`${FB_DB}/${path}.json`);
-      if (!r.ok) return null;
-      return await r.json();
-    } catch { return null; }
-  }
-
-  async function saveRTDB(path, data) {
-    try {
-      await fetch(`${FB_DB}/${path}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-    } catch (e) { console.error('RTDB write failed:', e); }
+  function valOrArray(snapshot) {
+    const v = snapshot.val();
+    if (!v) return null;
+    if (Array.isArray(v)) return v;
+    const keys = Object.keys(v);
+    if (keys.length === 0) return null;
+    const isIndexed = keys.every(k => /^\d+$/.test(k));
+    if (isIndexed) {
+      const arr = [];
+      keys.sort((a, b) => parseInt(a) - parseInt(b));
+      keys.forEach(k => arr.push(v[k]));
+      return arr;
+    }
+    return [v];
   }
 
   async function syncFromDB() {
-    const [cloudUsers, cloudAnns] = await Promise.all([
-      fetchRTDB('users'),
-      fetchRTDB('announcements')
-    ]);
-    const localUsers = getUsers();
-    const localAnns = getAnnouncements();
+    try {
+      const [userSnap, annSnap] = await Promise.all([
+        FB_USERS_REF.once('value'),
+        FB_ANNS_REF.once('value')
+      ]);
+      const cloudUsers = valOrArray(userSnap);
+      const cloudAnns = valOrArray(annSnap);
+      const localUsers = getUsers();
+      const localAnns = getAnnouncements();
 
-    if (cloudUsers && cloudUsers.length) {
-      const merged = [...localUsers];
-      cloudUsers.forEach(cu => {
-        const idx = merged.findIndex(u => u.email === cu.email);
-        if (idx !== -1) merged[idx] = cu;
-        else merged.push(cu);
-      });
-      localStorage.setItem(LS_USERS, JSON.stringify(merged));
-    } else if (localUsers.length) {
-      saveRTDB('users', localUsers);
-    }
+      if (cloudUsers && cloudUsers.length) {
+        const merged = [...localUsers];
+        cloudUsers.forEach(cu => {
+          const idx = merged.findIndex(u => u.email === cu.email);
+          if (idx !== -1) merged[idx] = cu;
+          else merged.push(cu);
+        });
+        localStorage.setItem(LS_USERS, JSON.stringify(merged));
+      } else if (localUsers.length) {
+        FB_USERS_REF.set(localUsers);
+      }
 
-    if (cloudAnns && cloudAnns.length) {
-      const merged = [...localAnns];
-      cloudAnns.forEach(ca => {
-        const idx = merged.findIndex(a => a.id === ca.id);
-        if (idx !== -1) merged[idx] = ca;
-        else merged.push(ca);
-      });
-      localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(merged));
-    } else if (localAnns.length) {
-      saveRTDB('announcements', localAnns);
-    }
+      if (cloudAnns && cloudAnns.length) {
+        const merged = [...localAnns];
+        cloudAnns.forEach(ca => {
+          const idx = merged.findIndex(a => a.id === ca.id);
+          if (idx !== -1) merged[idx] = ca;
+          else merged.push(ca);
+        });
+        localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(merged));
+      } else if (localAnns.length) {
+        FB_ANNS_REF.set(localAnns);
+      }
+    } catch (e) { console.error('syncFromDB failed:', e); }
 
     renderEpisodes();
     renderAnnouncements();
@@ -774,7 +778,8 @@
   async function saveUsers(u) {
     localStorage.setItem(LS_USERS, JSON.stringify(u));
     try {
-      const cloud = await fetchRTDB('users');
+      const snap = await FB_USERS_REF.once('value');
+      const cloud = valOrArray(snap);
       if (cloud && cloud.length) {
         const merged = [...cloud];
         u.forEach(localUser => {
@@ -782,9 +787,9 @@
           if (idx !== -1) merged[idx] = localUser;
           else merged.push(localUser);
         });
-        await saveRTDB('users', merged);
+        await FB_USERS_REF.set(merged);
       } else {
-        await saveRTDB('users', u);
+        await FB_USERS_REF.set(u);
       }
     } catch (e) { console.error('saveUsers RTDB failed:', e); }
   }
@@ -795,7 +800,8 @@
   async function saveAnnouncements(a) {
     localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
     try {
-      const cloud = await fetchRTDB('announcements');
+      const snap = await FB_ANNS_REF.once('value');
+      const cloud = valOrArray(snap);
       if (cloud && cloud.length) {
         const merged = [...cloud];
         a.forEach(localAnn => {
@@ -803,9 +809,9 @@
           if (idx !== -1) merged[idx] = localAnn;
           else merged.push(localAnn);
         });
-        await saveRTDB('announcements', merged);
+        await FB_ANNS_REF.set(merged);
       } else {
-        await saveRTDB('announcements', a);
+        await FB_ANNS_REF.set(a);
       }
     } catch (e) { console.error('saveAnnouncements RTDB failed:', e); }
   }
@@ -815,6 +821,7 @@
   const firebaseConfig = {
     apiKey: "AIzaSyB0TVbhWKGZEJ-gxmu3wPpeis4Eh9lZyjI",
     authDomain: "firefly-7e141.firebaseapp.com",
+    databaseURL: "https://firefly-7e141-default-rtdb.firebaseio.com",
     projectId: "firefly-7e141",
     storageBucket: "firefly-7e141.firebasestorage.app",
     messagingSenderId: "975424327009",
