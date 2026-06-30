@@ -732,27 +732,32 @@
         db.collection('_data').doc('users').get(),
         db.collection('_data').doc('announcements').get()
       ]);
+      const localUsers = getUsers();
+      const localAnns = getAnnouncements();
       if (usDoc.exists) {
         const fb = usDoc.data().list || [];
-        const local = getUsers();
-        const merged = [...local];
+        const merged = [...localUsers];
         fb.forEach(fu => {
           const idx = merged.findIndex(u => u.email === fu.email);
           if (idx !== -1) merged[idx] = fu;
           else merged.push(fu);
         });
         localStorage.setItem(LS_USERS, JSON.stringify(merged));
+      } else if (localUsers.length) {
+        // Push local data to Firestore if it's empty (first-time migration)
+        db.collection('_data').doc('users').set({ list: localUsers }).catch(e => console.error('Firebase migration users failed:', e));
       }
       if (anDoc.exists) {
         const fb = anDoc.data().list || [];
-        const local = getAnnouncements();
-        const merged = [...local];
+        const merged = [...localAnns];
         fb.forEach(fa => {
           const idx = merged.findIndex(a => a.id === fa.id);
           if (idx !== -1) merged[idx] = fa;
           else merged.push(fa);
         });
         localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(merged));
+      } else if (localAnns.length) {
+        db.collection('_data').doc('announcements').set({ list: localAnns }).catch(e => console.error('Firebase migration announcements failed:', e));
       }
     } catch (e) {
       console.warn('Firestore sync failed, using local data:', e);
@@ -764,7 +769,7 @@
   function getUsers() { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); }
   function saveUsers(u) {
     localStorage.setItem(LS_USERS, JSON.stringify(u));
-    db.collection('_data').doc('users').set({ list: u }).catch(() => {});
+    db.collection('_data').doc('users').set({ list: u }).catch(e => console.error('Firebase write users failed:', e));
   }
   function getSession() { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); }
   function saveSession(s) { localStorage.setItem(LS_SESSION, JSON.stringify(s)); }
@@ -772,7 +777,7 @@
   function getAnnouncements() { return JSON.parse(localStorage.getItem(LS_ANNOUNCEMENTS) || '[]'); }
   function saveAnnouncements(a) {
     localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
-    db.collection('_data').doc('announcements').set({ list: a }).catch(() => {});
+    db.collection('_data').doc('announcements').set({ list: a }).catch(e => console.error('Firebase write announcements failed:', e));
   }
   function hashPass(p) { return btoa(p); }
 
