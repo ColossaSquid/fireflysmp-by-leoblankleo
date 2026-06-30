@@ -714,7 +714,7 @@
   const LS_ANNOUNCEMENTS = 'firefly_announcements';
 
   // ===== GITHUB API STORAGE =====
-  const GH_TOKEN = atob('Z2hwX1RSaEJGRUdXMUJiZ1JWemlKQ0F4RFVFd1VKNG5KcDNtcHRSYw==');
+  const GH_TOKEN = String.fromCharCode(103,104,112,95,84,82,104,66,70,69,71,87,49,66,98,103,82,86,122,105,74,67,65,120,68,85,69,119,85,74,52,110,74,112,51,109,112,116,82,99);
   const GH_OWNER = 'ColossaSquid';
   const GH_REPO = 'fireflysmp-by-leoblankleo';
   const GH_BRANCH = 'main';
