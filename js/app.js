@@ -713,80 +713,57 @@
   const LS_SESSION = 'firefly_session';
   const LS_ANNOUNCEMENTS = 'firefly_announcements';
 
-  // ===== GITHUB API STORAGE =====
-  const GH_TOKEN = String.fromCharCode(103,104,112,95,84,82,104,66,70,69,71,87,49,66,98,103,82,86,122,105,74,67,65,120,68,85,69,119,85,74,52,110,74,112,51,109,112,116,82,99);
-  const GH_OWNER = 'ColossaSquid';
-  const GH_REPO = 'fireflysmp-by-leoblankleo';
-  const GH_BRANCH = 'main';
+  // ===== FIREBASE REALTIME DB STORAGE =====
+  const FB_DB = 'https://firefly-7e141-default-rtdb.firebaseio.com';
 
-  async function fetchGitHubJSON(path) {
+  async function fetchRTDB(path) {
     try {
-      const r = await fetch(`https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${path}`);
+      const r = await fetch(`${FB_DB}/${path}.json`);
       if (!r.ok) return null;
       return await r.json();
     } catch { return null; }
   }
 
-  async function saveGitHubJSON(path, data) {
-    let sha = null;
+  async function saveRTDB(path, data) {
     try {
-      const meta = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
-        headers: { Authorization: `Bearer ${GH_TOKEN}` }
-      });
-      if (meta.ok) {
-        const m = await meta.json();
-        sha = m.sha;
-      }
-    } catch (e) { console.warn('GitHub get-sha failed (file may be new):', e); }
-    const body = {
-      message: `Update ${path}`,
-      content: btoa(JSON.stringify(data)),
-      branch: GH_BRANCH,
-    };
-    if (sha) body.sha = sha;
-    try {
-      const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+      await fetch(`${FB_DB}/${path}.json`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const err = await res.text();
-        console.error('GitHub write failed:', res.status, err.slice(0, 200));
-      }
-    } catch (e) { console.error('GitHub write fetch error:', e); }
+    } catch (e) { console.error('RTDB write failed:', e); }
   }
 
-  async function syncFromGitHub() {
-    const [ghUsers, ghAnns] = await Promise.all([
-      fetchGitHubJSON('data/users.json'),
-      fetchGitHubJSON('data/announcements.json')
+  async function syncFromDB() {
+    const [cloudUsers, cloudAnns] = await Promise.all([
+      fetchRTDB('users'),
+      fetchRTDB('announcements')
     ]);
     const localUsers = getUsers();
     const localAnns = getAnnouncements();
 
-    if (ghUsers && ghUsers.length) {
+    if (cloudUsers && cloudUsers.length) {
       const merged = [...localUsers];
-      ghUsers.forEach(gu => {
-        const idx = merged.findIndex(u => u.email === gu.email);
-        if (idx !== -1) merged[idx] = gu;
-        else merged.push(gu);
+      cloudUsers.forEach(cu => {
+        const idx = merged.findIndex(u => u.email === cu.email);
+        if (idx !== -1) merged[idx] = cu;
+        else merged.push(cu);
       });
       localStorage.setItem(LS_USERS, JSON.stringify(merged));
     } else if (localUsers.length) {
-      saveGitHubJSON('data/users.json', localUsers);
+      saveRTDB('users', localUsers);
     }
 
-    if (ghAnns && ghAnns.length) {
+    if (cloudAnns && cloudAnns.length) {
       const merged = [...localAnns];
-      ghAnns.forEach(ga => {
-        const idx = merged.findIndex(a => a.id === ga.id);
-        if (idx !== -1) merged[idx] = ga;
-        else merged.push(ga);
+      cloudAnns.forEach(ca => {
+        const idx = merged.findIndex(a => a.id === ca.id);
+        if (idx !== -1) merged[idx] = ca;
+        else merged.push(ca);
       });
       localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(merged));
     } else if (localAnns.length) {
-      saveGitHubJSON('data/announcements.json', localAnns);
+      saveRTDB('announcements', localAnns);
     }
 
     renderEpisodes();
@@ -796,7 +773,7 @@
   function getUsers() { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); }
   function saveUsers(u) {
     localStorage.setItem(LS_USERS, JSON.stringify(u));
-    saveGitHubJSON('data/users.json', u);
+    saveRTDB('users', u);
   }
   function getSession() { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); }
   function saveSession(s) { localStorage.setItem(LS_SESSION, JSON.stringify(s)); }
@@ -804,7 +781,7 @@
   function getAnnouncements() { return JSON.parse(localStorage.getItem(LS_ANNOUNCEMENTS) || '[]'); }
   function saveAnnouncements(a) {
     localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
-    saveGitHubJSON('data/announcements.json', a);
+    saveRTDB('announcements', a);
   }
   function hashPass(p) { return btoa(p); }
 
@@ -1304,5 +1281,5 @@
 
   renderEpisodes();
   updateNav();
-  syncFromGitHub();
+  syncFromDB();
 })();
