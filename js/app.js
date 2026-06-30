@@ -11,8 +11,8 @@
     middle: {
       title: 'The Middle',
       badge: 'Middle',
-      leader: 'ArvPlayz7',
-      members: ['ShadowStrike', 'PixelWarden', 'IronVanguard', 'BlazeFury'],
+      leader: 'TBA',
+      members: ['ArvPlayz7', 'ShadowStrike', 'PixelWarden', 'IronVanguard', 'BlazeFury'],
     },
     destroyers: {
       title: 'The Destroyers',
