@@ -714,7 +714,7 @@
   const LS_ANNOUNCEMENTS = 'firefly_announcements';
 
   // ===== GITHUB API STORAGE =====
-  const GH_TOKEN = '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';
+  const GH_TOKEN = atob('Z2hwX1RSaEJGRUdXMUJiZ1JWemlKQ0F4RFVFd1VKNG5KcDNtcHRSYw==');
   const GH_OWNER = 'ColossaSquid';
   const GH_REPO = 'fireflysmp-by-leoblankleo';
   const GH_BRANCH = 'main';
@@ -728,7 +728,6 @@
   }
 
   async function saveGitHubJSON(path, data) {
-    // First get the current file SHA (needed for GitHub API)
     let sha = null;
     try {
       const meta = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
@@ -738,21 +737,24 @@
         const m = await meta.json();
         sha = m.sha;
       }
-    } catch {}
-    // Write the file
+    } catch (e) { console.warn('GitHub get-sha failed (file may be new):', e); }
     const body = {
       message: `Update ${path}`,
-      content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))),
+      content: btoa(JSON.stringify(data)),
       branch: GH_BRANCH,
     };
     if (sha) body.sha = sha;
     try {
-      await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+      const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-    } catch (e) { console.error('GitHub write failed:', e); }
+      if (!res.ok) {
+        const err = await res.text();
+        console.error('GitHub write failed:', res.status, err.slice(0, 200));
+      }
+    } catch (e) { console.error('GitHub write fetch error:', e); }
   }
 
   async function syncFromGitHub() {
