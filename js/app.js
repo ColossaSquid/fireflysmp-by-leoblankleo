@@ -8,12 +8,6 @@
       leader: 'MohammedBuH',
       members: ['Icyblox8', 'CraftMaster_22', 'IronGuardian', 'StoneWall_'],
     },
-    middle: {
-      title: 'The Middle',
-      badge: 'Middle',
-      leader: 'TBA',
-      members: ['ArvPlayz7', 'ShadowStrike', 'PixelWarden', 'IronVanguard', 'BlazeFury'],
-    },
     destroyers: {
       title: 'The Destroyers',
       badge: 'Destroyers',
@@ -77,52 +71,7 @@
 
   document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 
-  // ===== TEAM MODAL =====
-  const modal = document.getElementById('teamModal');
-  const modalClose = document.getElementById('modalClose');
-  const modalBadge = document.getElementById('modalBadge');
-  const modalTitle = document.getElementById('modalTitle');
-  const modalLeader = document.getElementById('modalLeader');
-  const modalMembers = document.getElementById('modalMembers');
-
-  const teamColors = {
-    law: { bg: 'rgba(74, 144, 217, 0.12)', color: '#6aafe0' },
-    middle: { bg: 'rgba(255, 215, 0, 0.12)', color: '#ffd700' },
-    destroyers: { bg: 'rgba(231, 76, 60, 0.12)', color: '#ff6b6b' },
-    villagers: { bg: 'rgba(46, 204, 113, 0.12)', color: '#5ae08a' },
-  };
-
-  function openModal(teamKey) {
-    const data = teamData[teamKey];
-    if (!data) return;
-    const colors = teamColors[teamKey] || {};
-    modalBadge.textContent = data.badge;
-    modalTitle.textContent = data.title;
-    modalLeader.textContent = data.leader;
-    modalBadge.style.background = colors.bg || '';
-    modalBadge.style.color = colors.color || '';
-    modalMembers.innerHTML = data.members.map(m => `<li>${m}</li>`).join('');
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeModal() {
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-
-  document.querySelectorAll('.team-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const team = card.dataset.team;
-      if (team) openModal(team);
-    });
-  });
-
-  if (modalClose) modalClose.addEventListener('click', closeModal);
-  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal.classList.contains('active')) closeModal();
-  });
+  // ===== TEAM MODAL (disabled - click no longer shows members) =====
 
   // ===== LIVE DISCORD DATA =====
   (function fetchDiscordData() {
