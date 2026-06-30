@@ -713,7 +713,100 @@
   const LS_SESSION = 'firefly_session';
   const LS_ANNOUNCEMENTS = 'firefly_announcements';
 
-  // ===== FIREBASE INIT =====
+  // ===== GITHUB API STORAGE =====
+  const GH_TOKEN = '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';
+  const GH_OWNER = 'ColossaSquid';
+  const GH_REPO = 'fireflysmp-by-leoblankleo';
+  const GH_BRANCH = 'main';
+
+  async function fetchGitHubJSON(path) {
+    try {
+      const r = await fetch(`https://raw.githubusercontent.com/${GH_OWNER}/${GH_REPO}/${GH_BRANCH}/${path}`);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  }
+
+  async function saveGitHubJSON(path, data) {
+    // First get the current file SHA (needed for GitHub API)
+    let sha = null;
+    try {
+      const meta = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+        headers: { Authorization: `Bearer ${GH_TOKEN}` }
+      });
+      if (meta.ok) {
+        const m = await meta.json();
+        sha = m.sha;
+      }
+    } catch {}
+    // Write the file
+    const body = {
+      message: `Update ${path}`,
+      content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))),
+      branch: GH_BRANCH,
+    };
+    if (sha) body.sha = sha;
+    try {
+      await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${GH_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) { console.error('GitHub write failed:', e); }
+  }
+
+  async function syncFromGitHub() {
+    const [ghUsers, ghAnns] = await Promise.all([
+      fetchGitHubJSON('data/users.json'),
+      fetchGitHubJSON('data/announcements.json')
+    ]);
+    const localUsers = getUsers();
+    const localAnns = getAnnouncements();
+
+    if (ghUsers && ghUsers.length) {
+      const merged = [...localUsers];
+      ghUsers.forEach(gu => {
+        const idx = merged.findIndex(u => u.email === gu.email);
+        if (idx !== -1) merged[idx] = gu;
+        else merged.push(gu);
+      });
+      localStorage.setItem(LS_USERS, JSON.stringify(merged));
+    } else if (localUsers.length) {
+      saveGitHubJSON('data/users.json', localUsers);
+    }
+
+    if (ghAnns && ghAnns.length) {
+      const merged = [...localAnns];
+      ghAnns.forEach(ga => {
+        const idx = merged.findIndex(a => a.id === ga.id);
+        if (idx !== -1) merged[idx] = ga;
+        else merged.push(ga);
+      });
+      localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(merged));
+    } else if (localAnns.length) {
+      saveGitHubJSON('data/announcements.json', localAnns);
+    }
+
+    renderEpisodes();
+    renderAnnouncements();
+  }
+
+  function getUsers() { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); }
+  function saveUsers(u) {
+    localStorage.setItem(LS_USERS, JSON.stringify(u));
+    saveGitHubJSON('data/users.json', u);
+  }
+  function getSession() { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); }
+  function saveSession(s) { localStorage.setItem(LS_SESSION, JSON.stringify(s)); }
+  function clearSession() { localStorage.removeItem(LS_SESSION); }
+  function getAnnouncements() { return JSON.parse(localStorage.getItem(LS_ANNOUNCEMENTS) || '[]'); }
+  function saveAnnouncements(a) {
+    localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
+    saveGitHubJSON('data/announcements.json', a);
+  }
+  function hashPass(p) { return btoa(p); }
+
+  // ===== FIREBASE AUTH (Google Sign-In) =====
   const firebaseConfig = {
     apiKey: "AIzaSyB0TVbhWKGZEJ-gxmu3wPpeis4Eh9lZyjI",
     authDomain: "firefly-7e141.firebaseapp.com",
@@ -724,62 +817,35 @@
     measurementId: "G-CW1X29CP35"
   };
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const auth = firebase.auth();
+  const googleProvider = new firebase.auth.GoogleAuthProvider();
 
-  async function syncFromFirestore() {
+  async function signInWithGoogle() {
     try {
-      const [usDoc, anDoc] = await Promise.all([
-        db.collection('_data').doc('users').get(),
-        db.collection('_data').doc('announcements').get()
-      ]);
-      const localUsers = getUsers();
-      const localAnns = getAnnouncements();
-      if (usDoc.exists) {
-        const fb = usDoc.data().list || [];
-        const merged = [...localUsers];
-        fb.forEach(fu => {
-          const idx = merged.findIndex(u => u.email === fu.email);
-          if (idx !== -1) merged[idx] = fu;
-          else merged.push(fu);
+      const result = await auth.signInWithPopup(googleProvider);
+      const user = result.user;
+      const email = user.email.toLowerCase();
+      const displayName = user.displayName || email.split('@')[0];
+      let users = getUsers();
+      let existing = users.find(u => u.email === email);
+      if (!existing) {
+        users.push({
+          email,
+          password: '(google)',
+          rawPassword: '(google)',
+          name: displayName,
+          joined: new Date().toISOString().split('T')[0],
         });
-        localStorage.setItem(LS_USERS, JSON.stringify(merged));
-      } else if (localUsers.length) {
-        // Push local data to Firestore if it's empty (first-time migration)
-        db.collection('_data').doc('users').set({ list: localUsers }).catch(e => console.error('Firebase migration users failed:', e));
+        saveUsers(users);
       }
-      if (anDoc.exists) {
-        const fb = anDoc.data().list || [];
-        const merged = [...localAnns];
-        fb.forEach(fa => {
-          const idx = merged.findIndex(a => a.id === fa.id);
-          if (idx !== -1) merged[idx] = fa;
-          else merged.push(fa);
-        });
-        localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(merged));
-      } else if (localAnns.length) {
-        db.collection('_data').doc('announcements').set({ list: localAnns }).catch(e => console.error('Firebase migration announcements failed:', e));
-      }
+      saveSession({ email, name: existing ? existing.name : displayName });
+      closeAuthModal();
+      updateNav();
     } catch (e) {
-      console.warn('Firestore sync failed, using local data:', e);
+      console.error('Google sign-in failed:', e);
+      authError.textContent = 'Google sign-in failed. Try again.';
     }
-    renderEpisodes();
-    renderAnnouncements();
   }
-
-  function getUsers() { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); }
-  function saveUsers(u) {
-    localStorage.setItem(LS_USERS, JSON.stringify(u));
-    db.collection('_data').doc('users').set({ list: u }).catch(e => console.error('Firebase write users failed:', e));
-  }
-  function getSession() { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); }
-  function saveSession(s) { localStorage.setItem(LS_SESSION, JSON.stringify(s)); }
-  function clearSession() { localStorage.removeItem(LS_SESSION); }
-  function getAnnouncements() { return JSON.parse(localStorage.getItem(LS_ANNOUNCEMENTS) || '[]'); }
-  function saveAnnouncements(a) {
-    localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
-    db.collection('_data').doc('announcements').set({ list: a }).catch(e => console.error('Firebase write announcements failed:', e));
-  }
-  function hashPass(p) { return btoa(p); }
 
   const authModal = document.getElementById('authModal');
   const authModalClose = document.getElementById('authModalClose');
@@ -900,6 +966,7 @@
   // Gate buttons
   document.getElementById('gateLoginBtn').addEventListener('click', () => openAuthModal('login'));
   document.getElementById('gateRegisterBtn').addEventListener('click', () => openAuthModal('register'));
+  document.getElementById('googleSignInBtn').addEventListener('click', signInWithGoogle);
 
   // ============================================================
   // ANNOUNCEMENTS
@@ -1235,5 +1302,5 @@
 
   renderEpisodes();
   updateNav();
-  syncFromFirestore();
+  syncFromGitHub();
 })();

@@ -2074,6 +2074,43 @@ img { max-width: 100%; display: block; }
 .auth-toggle-text a { color: var(--glow); cursor: pointer; font-weight: 600; }
 .auth-toggle-text a:hover { text-decoration: underline; }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.auth-google-btn {
+  width: 100%;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.06) !important;
+  color: rgba(255,255,255,0.85) !important;
+  border: 1px solid var(--border) !important;
+  padding: 12px 24px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.auth-google-btn:hover {
+  background: rgba(255,255,255,0.1) !important;
+  border-color: rgba(255,255,255,0.2) !important;
+  transform: translateY(-1px);
+}
+
 /* ===== ANNOUNCEMENTS ===== */
 .announcements {
   padding: 100px 0;
