@@ -779,17 +779,31 @@
 
   async function syncFromFirestore() {
     try {
-      const [usSnap, anSnap] = await Promise.all([
-        db.collection('users').get(),
-        db.collection('announcements').get()
+      const [usDoc, anDoc] = await Promise.all([
+        db.collection('_data').doc('users').get(),
+        db.collection('_data').doc('announcements').get()
       ]);
-      if (!usSnap.empty) {
-        const users = usSnap.docs.map(d => d.data());
-        localStorage.setItem(LS_USERS, JSON.stringify(users));
+      if (usDoc.exists) {
+        const fb = usDoc.data().list || [];
+        const local = getUsers();
+        const merged = [...local];
+        fb.forEach(fu => {
+          const idx = merged.findIndex(u => u.email === fu.email);
+          if (idx !== -1) merged[idx] = fu;
+          else merged.push(fu);
+        });
+        localStorage.setItem(LS_USERS, JSON.stringify(merged));
       }
-      if (!anSnap.empty) {
-        const announcements = anSnap.docs.map(d => d.data());
-        localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(announcements));
+      if (anDoc.exists) {
+        const fb = anDoc.data().list || [];
+        const local = getAnnouncements();
+        const merged = [...local];
+        fb.forEach(fa => {
+          const idx = merged.findIndex(a => a.id === fa.id);
+          if (idx !== -1) merged[idx] = fa;
+          else merged.push(fa);
+        });
+        localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(merged));
       }
     } catch (e) {
       console.warn('Firestore sync failed, using local data:', e);
@@ -801,7 +815,7 @@
   function getUsers() { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); }
   function saveUsers(u) {
     localStorage.setItem(LS_USERS, JSON.stringify(u));
-    u.forEach(user => db.collection('users').doc(user.email).set(user).catch(() => {}));
+    db.collection('_data').doc('users').set({ list: u }).catch(() => {});
   }
   function getSession() { return JSON.parse(localStorage.getItem(LS_SESSION) || 'null'); }
   function saveSession(s) { localStorage.setItem(LS_SESSION, JSON.stringify(s)); }
@@ -809,12 +823,7 @@
   function getAnnouncements() { return JSON.parse(localStorage.getItem(LS_ANNOUNCEMENTS) || '[]'); }
   function saveAnnouncements(a) {
     localStorage.setItem(LS_ANNOUNCEMENTS, JSON.stringify(a));
-    const batch = db.batch();
-    a.forEach(ann => {
-      const ref = db.collection('announcements').doc(ann.id);
-      batch.set(ref, ann);
-    });
-    batch.commit().catch(() => {});
+    db.collection('_data').doc('announcements').set({ list: a }).catch(() => {});
   }
   function hashPass(p) { return btoa(p); }
 
@@ -1174,7 +1183,6 @@
     let announcements = getAnnouncements();
     announcements = announcements.filter(a => a.id !== id);
     saveAnnouncements(announcements);
-    db.collection('announcements').doc(id).delete().catch(() => {});
     renderAdminDashboard();
     renderAnnouncements();
   }
