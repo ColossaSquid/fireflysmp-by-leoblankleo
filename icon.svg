@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffec80"/>
+      <stop offset="60%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#b8960f"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="106" cy="60" rx="38" ry="18" fill="url(#g)" opacity="0.35"/>
+  <ellipse cx="96" cy="96" rx="52" ry="52" fill="url(#g)" opacity="0.12"/>
+  <ellipse cx="96" cy="96" rx="32" ry="32" fill="url(#g)" opacity="0.08"/>
+  <ellipse cx="96" cy="96" rx="18" ry="18" fill="url(#g)" opacity="0.05"/>
+  <!-- body -->
+  <ellipse cx="96" cy="96" rx="14" ry="22" fill="#2a2a1a" stroke="#ffd700" stroke-width="1.5"/>
+  <!-- wings -->
+  <ellipse cx="76" cy="88" rx="18" ry="8" fill="rgba(255,215,0,0.15)" stroke="rgba(255,215,0,0.3)" stroke-width="1" transform="rotate(-20, 76, 88)"/>
+  <ellipse cx="116" cy="88" rx="18" ry="8" fill="rgba(255,215,0,0.15)" stroke="rgba(255,215,0,0.3)" stroke-width="1" transform="rotate(20, 116, 88)"/>
+  <!-- glow abdomen -->
+  <ellipse cx="96" cy="108" rx="7" ry="5" fill="#ffd700" opacity="0.9"/>
+  <ellipse cx="96" cy="108" rx="4" ry="3" fill="#ffec80"/>
+  <!-- eyes -->
+  <circle cx="90" cy="90" r="2" fill="#ffd700"/>
+  <circle cx="102" cy="90" r="2" fill="#ffd700"/>
+</svg>
